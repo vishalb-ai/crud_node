@@ -1,8 +1,8 @@
 # crud_node
-##Step 1
+Step 1
 Create a database named as employeedb, in employeedb create a schema named as employee, and then create columns named as id, employee_name, employee_salary, employee_age, profile_image.
 
-##Step 2 
+Step 2 
 Run node index.js
 
 ##Then, 
