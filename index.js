@@ -5,7 +5,7 @@ const bodyparser = require('body-parser');
 
 app.use(bodyparser.json());
 
-var mysqlConnection = mysql.createConnection({
+var pool = mysql.createPool({
     host: 'localhost',
     user: 'root',
     password: 'password',
@@ -13,72 +13,104 @@ var mysqlConnection = mysql.createConnection({
     multipleStatements: true
 });
 
-mysqlConnection.connect((err) => {
-    if (!err)
-        console.log('DB connection succeded.');
-    else
-        console.log('DB connection failed \n Error : ' + JSON.stringify(err, undefined, 2));
-});
-
-
-app.listen(3000, () => console.log('Express server is runnig at port no : 3000'));
-
-
-//Get all employees
+// Get all employees
 app.get('/employees', (req, res) => {
-    mysqlConnection.query('SELECT * FROM Employee', (err, rows, fields) => {
-        if (!err)
-            res.send(rows);
-        else
-            console.log(err);
-    })
-});
+    pool.getConnection((err, connection) => {
+        if(err) throw err
+        console.log('connected as id ' + connection.threadId)
+        connection.query('SELECT * from Employee', (err, rows) => {
+            connection.release() // return the connection to pool
 
-//Get an employee
+            if (!err) {
+                res.send(rows)
+            } else {
+                console.log(err)
+            }
+
+            // if(err) throw err
+            console.log('The data from employee table are: \n', rows)
+        })
+    })
+})
+
+// Get an employee
 app.get('/employees/:id', (req, res) => {
-    mysqlConnection.query('SELECT * FROM Employee WHERE id = ?', [req.params.id], (err, rows, fields) => {
-        if (!err)
-            res.send(rows);
-        else
-            console.log(err);
+    pool.getConnection((err, connection) => {
+        if(err) throw err
+        connection.query('SELECT * FROM Employee WHERE id = ?', [req.params.id], (err, rows) => {
+            connection.release() // return the connection to pool
+            if (!err) {
+                res.send(rows)
+            } else {
+                console.log(err)
+            }
+            
+            console.log('The data from employee table are: \n', rows)
+        })
     })
 });
 
-//Delete an employee
+// Delete a employee
 app.delete('/employees/:id', (req, res) => {
-    mysqlConnection.query('DELETE FROM Employee WHERE id = ?', [req.params.id], (err, rows, fields) => {
-        if (!err)
-            res.send('Deleted successfully.');
-        else
-            console.log(err);
+
+    pool.getConnection((err, connection) => {
+        if(err) throw err
+        connection.query('DELETE FROM Employee WHERE id = ?', [req.params.id], (err, rows) => {
+            connection.release() // return the connection to pool
+            if (!err) {
+                res.send(`Employee with the record ID ${[req.params.id]} has been removed.`)
+            } else {
+                console.log(err)
+            }
+            
+            console.log('The data from employee table are: \n', rows)
+        })
     })
 });
 
-//Insert an employee
+// Add employee
 app.post('/employees', (req, res) => {
-    let emp = req.body;
-    var sql = "SET @id = ?;SET @employee_name = ?;SET @employee_salary = ?;SET @employee_age = ?; \
-    CALL emp_add_edit(@id,@employee_name,@employee_salary,@employee_age);";
-    mysqlConnection.query(sql, [emp.id, emp.employee_name, emp.employee_salary, emp.employee_age], (err, rows, fields) => {
-        if (!err)
-            rows.forEach(element => {
-                if(element.constructor == Array)
-                res.send('Inserted employee id : '+element[0].id);
-            });
-        else
-            console.log(err);
+
+    pool.getConnection((err, connection) => {
+        if(err) throw err
+        
+        const params = req.body
+        connection.query('INSERT INTO Employee SET ?', params, (err, rows) => {
+        connection.release() // return the connection to pool
+        if (!err) {
+            res.send(`Employee has been added.`)
+        } else {
+            console.log(err)
+        }
+        
+        console.log('The data from employee table are: \n', rows)
+
+        })
     })
 });
 
-//Update an employee
+//Update employee
 app.put('/employees', (req, res) => {
-    let emp = req.body;
-    var sql = "SET @id = ?;SET @employee_name = ?;SET @employee_salary = ?;SET @employee_age = ?; \
-    CALL emp_add_edit(@id,@employee_name,@employee_salary,@employee_age);";
-    mysqlConnection.query(sql, [emp.id, emp.employee_name, emp.employee_salary, emp.employee_age], (err, rows, fields) => {
-        if (!err)
-            res.send('Updated successfully');
-        else
-            console.log(err);
+
+    pool.getConnection((err, connection) => {
+        if(err) throw err
+        console.log(`connected as id ${connection.threadId}`)
+
+        const { id, employee_name, employee_salary, employee_age, profile_image } = req.body
+
+        connection.query('UPDATE Employee SET employee_name = ?, employee_salary = ?, employee_age = ?, profile_image = ? WHERE id = ?', [employee_name, employee_salary, employee_age, profile_image, id] , (err, rows) => {
+            connection.release() 
+            if(!err) {
+                res.send(`Employee with the name: ${employee_name} has been added.`)
+            } else {
+                console.log(err)
+            }
+
+        })
+
+        console.log(req.body)
     })
-});
+})
+
+// Listen on enviroment port or 3000
+app.listen(3000, () => console.log('Express server is running at port no : 3000'));
